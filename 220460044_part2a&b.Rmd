@@ -1,0 +1,132 @@
+---
+UOLID: "220460044"
+Subject Code: "ST2195"
+---
+## Part 2
+
+## (a)
+```{r}
+library(dplyr)
+```
+
+### Delay by time of day
+```{r}
+# Loop through each year
+for (i in 1991:2000) {
+  
+  # Read data for the current year
+  ontime <- read.csv(paste0(i, ".csv"), header = TRUE)
+  
+  # Calculate TimeOfDayGroup
+  ontime$TimeOfDayGroup <- cut(as.numeric(substr(ontime$DepTime, 1, 2)),
+                               breaks = c(-Inf, 6, 12, 18, Inf),
+                               labels = c("Night", "Morning", "Afternoon", "Evening"))
+  
+  # Group by TimeOfDayGroup and calculate average delay for each year
+  daydelay <- ontime %>%
+    group_by(TimeOfDayGroup) %>%
+    summarize(AvgDelay = mean(ArrDelay, na.rm = TRUE)) %>%
+    arrange(AvgDelay)
+  
+  print(daydelay)
+}
+```
+
+### Delay by days of week
+```{r}
+for (i in c(1991:2000)) {
+  ontime <- read.csv(paste0(i, ".csv"), header = TRUE)
+  
+  # Group by DayOfWeek and calculate average delay
+  weekdelay <- ontime %>%
+    group_by(DayOfWeek) %>%
+    summarize(AvgDelay = mean(ArrDelay, na.rm = TRUE)) %>%
+    arrange(AvgDelay)
+  
+  print(weekdelay)
+}
+```
+
+### Delay by month
+```{r}
+for (i in c(1991:2000)) {
+  ontime <- read.csv(paste0(i, ".csv"), header = TRUE)
+  
+  # Group by Month and calculate average delay
+  monthdelay <- ontime %>%
+    group_by(Month) %>%
+    summarize(AvgDelay = mean(ArrDelay, na.rm = TRUE)) %>%
+    arrange(AvgDelay)
+  
+  print(monthdelay)
+}
+```
+
+
+## (b)
+
+### Read csv file
+```{r}
+planes_df <- read.csv("plane-data.csv", header = TRUE)
+```
+
+### Delay with Plane Age
+```{r}
+results <- list()
+
+# Loop over each year
+for (i in c(1991:2000)) {
+
+  planes_year <- planes_df %>%
+    mutate(
+      ManufacturingDate = as.Date(issue_date, format = "%d/%m/%Y"),
+      PlaneAge = i - as.numeric(format(ManufacturingDate, "%Y"))
+    ) %>%
+    filter(PlaneAge >= 0)
+  
+  # Select only the columns you need from planes_year
+  planes_year_subset <- planes_year %>%
+    select(tailnum, PlaneAge)
+
+  # Join the data frames
+  ontime_age <- inner_join(ontime, planes_year_subset, by = c("TailNum" = "tailnum"))
+
+  # Calculate average delay for the current year
+  agedelay_year <- ontime_age %>%
+    group_by(PlaneAge) %>%
+    summarize(AvgTotalDelay = mean(DepDelay + ArrDelay, na.rm = TRUE))
+  
+  # Store the result in the list
+  results[[as.character(i)]] <- agedelay_year
+  
+}
+
+# Print the results
+for (i in c(1991:2001)) {
+  print(results[[as.character(i)]])
+}
+```
+
+### Focusing on year 2000
+```{r}
+# Drawing the graph
+ggplot(agedelay_year, aes(x = PlaneAge, y = AvgTotalDelay)) +
+  geom_line() +
+  labs(title = "Average Delay by Plane Age (Year 2000)",
+       x = "Plane Age",
+       y = "Average Delay")
+
+# Count the number of flights for each plane age group in the year 2000
+flight_counts <- ontime_age %>%
+  group_by(PlaneAge) %>%
+  summarize(NumFlights = n())
+
+# Create a bar plot for the number of flights by plane age group
+ggplot(flight_counts, aes(x = factor(PlaneAge), y = NumFlights)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Number of Flights by Plane Age (Year 2000)",
+       x = "Plane Age",
+       y = "Number of Flights") +
+  theme_minimal()
+```
+

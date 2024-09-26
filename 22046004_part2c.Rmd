@@ -1,0 +1,62 @@
+---
+UOLID: "220460044"
+Subject Code: "ST2195"
+---
+## (c)
+### Loading packages for Logistic Regression
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+### Setting up to get coefficients per year
+```{r}
+carriers_df <- read.csv("carriers.csv", header = TRUE)
+coefficients_list <- list()
+
+# Creating data frame to store probabilities
+probabilities_df <- data.frame(Year = integer(), Probability = numeric())
+
+# Iterate over each year
+for (i in c(1991:2000)) {
+  # Filter data for the current year
+  ontime_c <- read.csv(paste0(i, ".csv"), header = TRUE)
+  
+  # Left join with carriers_df to include carrier information
+  ontime_ci <- ontime_c %>%
+    left_join(carriers_df, by = c("UniqueCarrier" = "Code"))
+  
+  # Prepare features and target variable
+  features <- c("DepDelay", "CRSDepTime", "CRSArrTime", "Distance", "UniqueCarrier")
+  target <- "Diverted"
+  
+  # Converting Unique carrier from character to a factor
+  ontime_ci$UniqueCarrier <- as.factor(ontime_ci$UniqueCarrier)
+  
+  # Fit logistic regression model
+  model <- glm(formula = as.formula(paste(target, "~", paste(features, collapse = " + "))),
+                data = ontime_ci, family = binomial)
+ 
+  # Predict probabilities of plane being diverted
+  probabilities <- predict(model, type = "response")
+  
+  # Aggregate and store probabilities
+  year_probability <- mean(probabilities)
+  probabilities_df <- rbind(probabilities_df, data.frame(Year = i, Probability = year_probability))
+
+  # Get coefficients
+  coefficients <- coef(model)
+  
+   # Store coefficients and corresponding year
+  coefficients_list[[i]] <- coefficients
+
+  # Create a barplot for the current year
+  barplot(coefficients, main = paste("Logistic Regression Coefficients for Year", i),
+          xlab = "Features", ylab = "Coefficient Value")
+}
+
+# Create a line graph for probability of diversion over the years
+plot(probabilities_df$Year, probabilities_df$Probability, type = "l",
+     main = "Probability of Diverted US Flights Over Time",
+     xlab = "Year", ylab = "Probability")
+```
+

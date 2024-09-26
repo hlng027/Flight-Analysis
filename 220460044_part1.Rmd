@@ -1,0 +1,305 @@
+---
+UOLID: "220460044"
+Subject Code: "ST2195"
+---
+# Part (1)
+
+## (a)
+
+### Given probability density function
+```{r}
+f <- function(x) {
+  return(0.5 * exp(-abs(x)))# defining f(x)
+}
+```
+
+### Step 1:
+```{r}
+x0 <- 0     # initial x value
+N <- 10000  # sample size
+s <- 1      # standard deviation
+```
+
+
+### Step 2: Function to perform Metropolis-Hastings Algorithm.
+```{r}
+# setting up Metropolis-Hasting Algorithm
+mh <- function (N, x0, s){
+  x <- numeric(N) # setting up numeric vector to store generated x
+  x_current <- x0 
+  
+  for (i in 1:N) {
+    x_star <- rnorm(1, mean = x_current, sd = s)  # simulate random x* from Normal distribution
+    
+    # computing log acceptance ratio
+    lg_r <- log(f(x_star)) - log(f(x_current)) # log is taken to make sure linearity
+    
+    # generate random number u
+    lg_u <- log(runif(1)) # random u from uniform distribution from [0,1)
+    
+    # accept or reject x0 based on log acceptance ratio
+    if (lg_u < lg_r) {
+      x_current <- x_star # accepted
+    } else {
+      x_current <- x_current # rejected
+    }
+    
+    # saving the sample
+    x[i] <- x_current
+  }
+  
+  return(x)
+}
+```
+
+### Running Metropolis-Hastings Algorithm.
+```{r}
+x <- mh(N, x0, s)
+
+# To plot a histogram
+hist(x, main = "Metropolis-Hastings Samples", xlab = "X", prob = TRUE)
+
+# To plot a kernel density plot
+lines(density(x), col = 'purple',lwd = 1)
+
+# Plotting f(x) distribution into existing plot
+curve(f(x), from = min(x), to = max(x), col = 'pink', add = TRUE, lwd = 1)
+```
+
+### Reporting Sample mean and Standard deviation of generated samples.
+``` {r}
+montecarlo_mean <- mean(x)
+montecarlo_sd <- sd(x)
+
+# Printing results
+cat ("Monte Carlo Estimate of Mean:", montecarlo_mean, "\n") # cat is used to concatenate the values into a single string
+cat ("Monte Carlo Estimate of Standard Deviation:", montecarlo_sd, "\n")
+```
+
+## (b)
+
+## Part b parameters.
+```{r}
+N_b <- 2000
+s_b <- 0.001
+J_b <- 4
+```
+
+### Obtaining chain sequence.
+```{r}
+mh_chains <- function (N_b, s_b, J_b){
+  chains <- matrix (NA, nrow = N_b, ncol = J_b) # matrix to store chain, all values of (n,j) is NA
+
+for (j in 1:J_b){
+  x_current_b <- 0 # Setting all initial value of each chain as 0
+  
+  for (i_b in 1:N_b){
+    x_star_b <- rnorm(1, mean = x_current_b, sd = s_b) #simulate X*~N (x_current, s^2)
+    
+    # computing log acceptance ratio
+    lg_r_b <- log(f(x_star_b)) - log(f(x_current_b)) # log is taken to make sure linearity
+    
+    # generate random number u
+    lg_u_b <- log(runif(1)) # random u from uniform distribution from [0,1)
+    
+    # accept or reject x0 based on log acceptance ratio
+    if (lg_u_b < lg_r_b) {
+      x_current_b <- x_star_b
+    }
+    
+    chains[i_b,j] <- x_current_b # i and j defined in line 96 and 93 respectively
+  }
+}
+
+return(chains)
+}
+```
+
+
+## Computation:
+
+```{r}
+# generating chain with parameters
+chains_b <- mh_chains (N_b, s_b, J_b) 
+
+# checking for NA in chain
+if(any(is.na(chains_b))){
+  warning ("There in NA in chain_b")
+}
+```
+
+### Sample mean of chain j, Mj
+```{r}
+# function to loop through each chain and calculate sample mean
+sample_mean_chain <- function (chains_b, J_b){
+  M_j <- numeric (J_b)
+
+  for (j in 1:J_b) {
+    chain_j <- chains_b [,j]
+    M_j[j] <- mean(chain_j, na.rm = TRUE)
+  }
+  return (M_j)
+}
+
+# calculating sample mean for each chain
+M_j <- sample_mean_chain(chains_b, J_b)
+
+# print
+for (j in 1:J_b){
+  cat ("The sample mean, Mj, of chain j =", j, ":", M_j[j], "\n")
+}
+```
+
+### Sample variance of chain j, Vj
+```{r}
+# function for sample variance of chain j (looped)
+sample_variance_chain <- function (chains_b, J_b) {
+  V_j <- numeric (J_b)
+  
+  for (j in 1:J_b){
+    chain_j <- chains_b [,j]
+    V_j[j] <- sum((chain_j - mean(chain_j, na.rm = NA))^2)/N_b
+  }
+  return (V_j)
+}
+
+# calculating sample variance for each chain
+V_j <- sample_variance_chain (chains_b, J_b)
+
+# print
+for (j in 1:J_b){
+  cat ("The sample variance, Vj, of chain j =", j, ":", V_j[j], "\n")
+}
+```
+### Overall within sample variance, W
+```{r}
+# function for overall within sample variance W
+overall_within_variance <- function (chains_b, J_b){
+  W <- numeric (J_b)
+
+  W <- sum(V_j)/J_b 
+  
+  return (W)
+}
+
+# calculating overall within sample variance W
+W <- overall_within_variance(chains_b, J_b)
+
+# print
+cat ("The overall within sample variance, W:", W, "\n")
+
+```
+
+### Overall sample mean, M
+```{r}
+# function for overall sample mean M
+overall_sample_mean <- function (chains_b, J_b) {
+  M <- numeric (J_b)
+  
+  M <- sum(M_j)/J_b 
+  
+  return (M)
+}
+
+# calculating overall sample mean M
+M <- overall_sample_mean(chains_b, J_b)
+
+# print
+cat ("The overall sample mean, M:", M,  "\n")
+```
+
+### In between sample variance B
+```{r}
+# function for between sample variance B
+inbtw_var_B <- function (chains_b, J_b) {
+  B <- numeric (J_b)
+
+  B <- sum(M_j - M)^2 / J_b
+  
+  return (B)
+}
+
+# calculating between sample variance variance B
+B <- inbtw_var_B (chains_b, J_b)
+
+# print
+cat ("The between sample variance, B:", B,  "\n")
+
+```
+
+### R hat value
+```{r}
+# function for r hat
+calc_r_hat <- function (chains_b, J_b) {
+  r_hat <- numeric (J_b)
+  
+  r_hat <- sqrt ((B+W)/ W)
+
+  
+  return (r_hat)
+}
+
+# calculating r hat
+r_hat <- calc_r_hat (chains_b, J_b)
+
+# print
+cat ("The r hat value is", r_hat, "\n")
+
+```
+
+### Keeping N and J fixed, plot r hat over s [0.001, 1]
+```{r}
+# set seed to ensure reproducibility
+set.seed(123)
+
+# Metropolis-Hastings algorithm to generate chains for a given s
+metropolis_hastings <- function(x0, N_b, s, j) {
+  samples <- numeric(N_b) #Creating an empty vector with length N_b
+  current_value <- x0
+  
+  for (i in 1:N_b) {
+    x_star <- rnorm(1, mean = current_value, sd = s)
+    log_ratio <- -abs(x_star)^j + abs(x0)^j  # Old ratio with logarithm
+    log_u <- log(runif(1))
+    
+    if (log_u < log_ratio) {
+      current_value <- x_star
+    }
+    
+    samples[i] <- current_value
+  }
+  
+  return(samples)
+}
+
+# Function to calculate R_hat for a given s
+calc_R_hat <- function(N, s, J, j) {
+  chains <- replicate(J, metropolis_hastings(0, N, s, j))
+  M_j <- colMeans(chains, na.rm = TRUE)
+  V_j <- apply(chains, 2, var, na.rm = TRUE)
+  W <- mean(V_j)
+  M <- mean(M_j)
+  B <- mean((M_j - M)^2)
+  
+  # Ensure B is not zero to avoid division by zero
+  if (B == 0) {
+    B <- 1e-6  # Small nonzero value
+  }
+  
+  R_hat <- sqrt((B + W) / W)
+  
+  return(R_hat)
+}
+
+# Parameters
+N_s <- 2000
+J_s <- 4
+s_values <- seq(0.001, 1, length.out = 100)
+j_s <- 2  # used for raising power to 2
+
+# Calculate R_hat for each s
+R_hat_values <- sapply(s_values, calc_R_hat, N = N_s, J = J_s, j = j_s)
+
+# Plot the results
+plot(s_values, R_hat_values, type = "l", xlab = "s", ylab = "R_hat", main = "R_hat against s values")
+```
